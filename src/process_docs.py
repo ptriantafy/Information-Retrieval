@@ -19,7 +19,7 @@ for file in os.listdir('data/docs/raw'):
 
 
 #remove stop words from data/docs/processed
-# nltk.download('stopwords')
+# nltk.download('stopwords')    # uncomment if you don't have stopwords downloaded
 stop_words = nltk.corpus.stopwords.words('english')
 for file in os.listdir('data/docs/processed'):
     with open(os.path.join('data/docs/processed', file), 'r') as f:
