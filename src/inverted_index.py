@@ -20,3 +20,13 @@ for file in os.listdir(documents_path):
                     inverted_index[word][file] = [i]
                 else:
                     inverted_index[word][file].append(i)
+
+#this is for debugging perposes
+with open('data/inverted_index.txt', 'w+') as f:
+    for i, word in enumerate(inverted_index):
+        f.write(f"{word}: ")
+        for file in inverted_index[word]:
+            for position in inverted_index[word][file]:
+                f.write(f"({file}, {position}) ")
+        f.write('\n')
+    
