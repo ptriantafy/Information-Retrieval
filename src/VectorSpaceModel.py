@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import os
 import InvertedIndex 
-import pandas as pd
+# import pandas as pd
 
 class VectorSpaceModel:
 
@@ -88,6 +88,8 @@ class VectorSpaceModel:
         for file in os.listdir("data/docs/processed"):
             document_vectors.append(self.documentVector(file))
             print(f"Document vector for {file} generated")
+            if "00002.txt" in file:
+                break
         return np.array(document_vectors)
     
 

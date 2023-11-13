@@ -31,7 +31,7 @@ class InvertedIndex:
                         else:
                             inverted_index[word][file].append(i)
         if export:
-            self.exportInvertedIndex()
+            self.__exportInvertedIndex()
 
         return inverted_index
 
