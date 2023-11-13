@@ -2,14 +2,17 @@ import numpy as np
 import scipy as sp
 import os
 import InvertedIndex 
+import pandas as pd
 
 class VectorSpaceModel:
 
-    def __init__(self) -> None:
-        ii_obj = InvertedIndex.InvertedIndex()
-        self.inverted_index = ii_obj.generateInvertedIndex()
 
     #///////////// Private Methods ///////////////
+    def __init__(self) -> None:
+        ii_obj = InvertedIndex.InvertedIndex()
+        self.inverted_index = ii_obj.generateInvertedIndex(True)
+
+
 
     #Methods are pretty self expalnatory
     def __termOccurancesInDocument(self,term, document) -> int:
@@ -45,6 +48,7 @@ class VectorSpaceModel:
         return len(txt_files)
     
 
+
     #///////////// Public Methods ///////////////
     def termFrequency(self,term, document) -> float:
         return self.__termOccurancesInDocument(term,document)/self.__totalTermsInDocument(document)
@@ -60,26 +64,61 @@ class VectorSpaceModel:
         return self.termFrequency(term,document)*self.inverseDocumentFrequency(term)
         
 
-    #///TODO use sparse matrix
+
     def documentVector(self,document) -> np.array:
         inverted_index = self.inverted_index
         document_vector = []
         for term in inverted_index:
-            document_vector.append(self.termScore(term,document))
-        return np.array(document_vector)
-    
 
+            #if the term is in the document, add its score to the document vector
+            try:
+                document_vector.append(self.termScore(term,document))
+
+            #else insert 0
+            except:
+                document_vector.append(0)
+        
+
+        sparse_document_vector = sp.sparse.csr_matrix(document_vector)
+        return sparse_document_vector
+    
 
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
         for file in os.listdir("data/docs/processed"):
             document_vectors.append(self.documentVector(file))
+            print(f"Document vector for {file} generated")
         return np.array(document_vectors)
     
 
 
+    #Following functions are used for debugging purposes
+    # def count_unique_words(self, file_path = "data/docs/processed/00001.txt"):
+    #     unique_words = set()
+
+    #     with open(file_path, 'r') as file:
+    #         for line in file:
+    #             # Split the line into words and add them to the set
+    #             words = line.split()
+    #             unique_words.update(words)
+
+    #     return len(unique_words)
+
+
+
+    # def invertedIndexLength(self) -> int: 
+    #     inverted_index = self.inverted_index
+    #     return len(inverted_index)  
+
+
+
+
+
+
+#///////main testing script///////
 vsm = VectorSpaceModel()
 
-print(vsm.termScore('aeruginosa','00001.txt'))
+print(len(vsm.generateDocumentVectors()))
+
 
         
