@@ -8,7 +8,7 @@ class InvertedIndex:
         self.inverted_index = {}
 
 
-    def generateInvertedIndex(self):
+    def generateInvertedIndex(self,export = False):
         documents_path = self.documents_path
         inverted_index = self.inverted_index
 
@@ -30,9 +30,13 @@ class InvertedIndex:
                             inverted_index[word][file] = [i]
                         else:
                             inverted_index[word][file].append(i)
+        if export:
+            self.exportInvertedIndex()
+
+        return inverted_index
 
     
-    def exportInvertedIndex(self):
+    def __exportInvertedIndex(self):
         inverted_index = self.inverted_index
         #this is for debugging perposes
         with open('data/inverted_index.txt', 'w+') as f:
