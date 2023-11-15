@@ -91,8 +91,12 @@ class VectorSpaceModel:
         sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), document_vectors)
         return np.array(document_vectors)
     
-
-
+#   should work, but haven't tested it with real data yet
+    def getCosSimilarities(self, docs, query) -> np.array:
+        dot_products = np.dot(docs, query.T)
+        norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
+        cos_similarities = dot_products / norms
+        return cos_similarities
     #Following functions are used for debugging purposes
     # def count_unique_words(self, file_path = "data/docs/processed/00001.txt"):
     #     unique_words = set()
@@ -118,8 +122,6 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-vsm.generateDocumentVectors()
-# sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
-
-
-        
+# vsm.generateDocumentVectors()
+sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
+# print(sparse_matrix.tocsr().toarray())
