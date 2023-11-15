@@ -86,8 +86,9 @@ class VectorSpaceModel:
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
         for file in os.listdir("data/docs/processed"):
-            document_vectors.append(self.documentVector(file))
+            document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
             print(f"Document vector for {file} generated")
+        sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), document_vectors)
         return np.array(document_vectors)
     
 
@@ -117,8 +118,8 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-
-print(len(vsm.generateDocumentVectors()))
+vsm.generateDocumentVectors()
+# sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
 
 
         
