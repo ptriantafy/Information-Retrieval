@@ -85,7 +85,9 @@ class VectorSpaceModel:
 
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
-        for file in os.listdir("data/docs/processed"):
+        # sort files by name
+        for file in sorted(os.listdir("data/docs/processed")):
+        # for file in os.listdir("data/docs/processed"):
             document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
             print(f"Document vector for {file} generated")
         sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), document_vectors)
@@ -97,6 +99,9 @@ class VectorSpaceModel:
         norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
         cos_similarities = dot_products / norms
         return cos_similarities
+    
+    def getTopKDocs(self, cos_similarities, k) -> np.array:
+        return np.argsort(cos_similarities, axis=0)[-k:]
     #Following functions are used for debugging purposes
     # def count_unique_words(self, file_path = "data/docs/processed/00001.txt"):
     #     unique_words = set()
@@ -123,5 +128,9 @@ class VectorSpaceModel:
 #///////main testing script///////
 vsm = VectorSpaceModel()
 # vsm.generateDocumentVectors()
+# last 19 rows are query vectors, 1-10-11-12-13-14-15-16-17-18-19-2-3-4-5-6-7-8-9
 sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
+# return top 10 docs for each query
+for i in range(19):
+    print(vsm.getTopKDocs(vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[:-19], sparse_matrix.tocsr().toarray()[-19+i]), 10))
 # print(sparse_matrix.tocsr().toarray())
