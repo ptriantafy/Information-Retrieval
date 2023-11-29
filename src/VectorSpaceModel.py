@@ -63,7 +63,24 @@ class VectorSpaceModel:
     def termScore(self,term,document) -> float:
         return self.termFrequency(term,document)*self.inverseDocumentFrequency(term)
         
-
+    # queries should not be included in inverted index
+    def queryVector(self,query) -> np.array:
+        inverted_index = self.inverted_index
+        query_vector = []
+        for term in inverted_index:
+            found = 0
+            # if done like below, it can spot single syllables like "eg" which can
+            # also be parts of words like "egg" or "leg"
+            for word in query.split():
+                if len(np.nonzero(query_vector)) == len(query.split()):
+                    break
+                if term == word:
+                    found += 1
+                    # print(f"Term {term} found {found} times in query")
+            query_vector.append(found/len(query.split())*self.inverseDocumentFrequency(term))
+            #  break after appending len(query.split()) non zero columns
+        sparse_query_vector = sp.sparse.csr_matrix(query_vector)
+        return sparse_query_vector
 
     def documentVector(self,document) -> np.array:
         inverted_index = self.inverted_index
@@ -85,23 +102,24 @@ class VectorSpaceModel:
 
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
+        document_mapper = []
         # sort files by name
         for file in sorted(os.listdir("data/docs/processed")):
-        # for file in os.listdir("data/docs/processed"):
-            document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
-            print(f"Document vector for {file} generated")
-        sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), document_vectors)
-        return np.array(document_vectors)
+            document_mapper.append(file)
+            # document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
+            # print(f"Document vector for {file} generated")
+        return document_mapper
     
-#   should work, but haven't tested it with real data yet
     def getCosSimilarities(self, docs, query) -> np.array:
         dot_products = np.dot(docs, query.T)
         norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
-        cos_similarities = dot_products / norms
+        dot_products = dot_products.flatten()
+        # norms = np.linalg.norm(docs) * np.linalg.norm(query)
+        cos_similarities = np.divide(dot_products, norms)
         return cos_similarities
     
     def getTopKDocs(self, cos_similarities, k) -> np.array:
-        return np.argsort(cos_similarities, axis=0)[-k:]
+        return np.argsort(cos_similarities.flatten())[-k:][::-1]
     #Following functions are used for debugging purposes
     # def count_unique_words(self, file_path = "data/docs/processed/00001.txt"):
     #     unique_words = set()
@@ -127,10 +145,19 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-# vsm.generateDocumentVectors()
-# last 19 rows are query vectors, 1-10-11-12-13-14-15-16-17-18-19-2-3-4-5-6-7-8-9
+mapper = vsm.generateDocumentVectors()
+# print(len(mapper))
 sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
-# return top 10 docs for each query
-for i in range(19):
-    print(vsm.getTopKDocs(vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[:-19], sparse_matrix.tocsr().toarray()[-19+i]), 10))
-# print(sparse_matrix.tocsr().toarray())
+# print(sparse_matrix.shape)
+for file in sorted(os.listdir("data/Queries_Processed")):
+    print(f"query file: {file}")
+    with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
+        query = f.read()
+        # print(query)
+        query_vector = vsm.queryVector(query)
+        # exclude row 0 empty vector (don't know why)
+        cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
+        # print(cos_similarities.shape)
+        for i in vsm.getTopKDocs(cos_similarities, 20):
+            print(f"{mapper[i]}: {cos_similarities[i]}")
+        print()
