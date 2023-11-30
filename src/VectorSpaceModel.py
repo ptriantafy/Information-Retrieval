@@ -2,6 +2,8 @@ import numpy as np
 import scipy as sp
 import os
 import InvertedIndex 
+import time
+import concurrent.futures
 # import pandas as pd
 
 class VectorSpaceModel:
@@ -21,17 +23,16 @@ class VectorSpaceModel:
     
 
 
-    def __totalTermsInDocument(self,document) -> int:
-        inverted_index = self.inverted_index
-        total_terms = 0
-        for term in inverted_index:
-            try:
-                total_terms += len(inverted_index[term][document])
-            except:
-                pass
+    def __count_term_occurrences(self, term, document):
+        try:
+            return len(self.inverted_index[term][document])
+        except:
+            return 0
+
+    def __totalTermsInDocument(self, document) -> int:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            total_terms = sum(executor.map(lambda term: self.__count_term_occurrences(term, document), self.inverted_index))
         return total_terms
-
-
 
     def __totalDocumentsWithTerm(self,term) -> int:
         inverted_index = self.inverted_index
@@ -56,10 +57,6 @@ class VectorSpaceModel:
 
 
     def inverseDocumentFrequency(self,term) -> float:
-        if np.log(self.__totalDocuments()/self.__totalDocumentsWithTerm(term)) == 0:
-            print("=====================================")
-            print(f"Term {term} has 0 idf")
-            print("=====================================")
         return np.log(self.__totalDocuments()/self.__totalDocumentsWithTerm(term))
     
 
@@ -105,14 +102,18 @@ class VectorSpaceModel:
     
 
     def generateDocumentVectors(self) -> np.array:
+        start_time = time.time()
         document_vectors = []
+        file_names = []
         for i, file in enumerate(os.listdir("data/docs/processed")):
+            file_names.append(file)
             document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
             print(f"Document vector for {file} generated {i+1}/{len(os.listdir('data/docs/processed'))}")
         print(document_vectors.shape)
-        document_vectors = document_vectors[1:]        
+        document_vectors = sp.sparse.csr_matrix(np.delete(document_vectors.toarray(), (0), axis = 0))        
         sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_lemma.npz'), document_vectors)
-        return document_vectors
+        print(f"Document vectors generated in {time.time() - start_time} seconds")
+        return file_names
     
     def getCosSimilarities(self, docs, query) -> np.array:
         dot_products = np.dot(docs, query.T)
@@ -148,17 +149,17 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-vsm.generateDocumentVectors()
-sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_lemma.npz'))
-# print(sparse_matrix.shape)
-for file in sorted(os.listdir("data/Queries_Processed")):
-    print(f"query file: {file}")
-    with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
-        query = f.read()
-        # print(query)
-        query_vector = vsm.queryVector(query)
-        cos_similarities = vsm.getCosSimilarities(sparse_matrix.toarray(), query_vector.toarray())
-        # print(cos_similarities.shape)
-        for i in vsm.getTopKDocs(cos_similarities, 20):
-            print(f"{i}: {cos_similarities[i]}")
-        print()
+file_names = vsm.generateDocumentVectors()
+# sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_lemma.npz'))
+# # print(sparse_matrix.shape)
+# for file in sorted(os.listdir("data/Queries_Processed")):
+#     print(f"query file: {file}")
+#     with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
+#         query = f.read()
+#         # print(query)
+#         query_vector = vsm.queryVector(query)
+#         cos_similarities = vsm.getCosSimilarities(sparse_matrix.toarray(), query_vector.toarray())
+#         # print(cos_similarities.shape)
+#         for i in vsm.getTopKDocs(cos_similarities, 20):
+#             print(f"{file_names[i]}: {cos_similarities[i]}")
+#         print()
