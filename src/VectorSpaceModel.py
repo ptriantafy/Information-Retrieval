@@ -56,6 +56,10 @@ class VectorSpaceModel:
 
 
     def inverseDocumentFrequency(self,term) -> float:
+        if np.log(self.__totalDocuments()/self.__totalDocumentsWithTerm(term)) == 0:
+            print("=====================================")
+            print(f"Term {term} has 0 idf")
+            print("=====================================")
         return np.log(self.__totalDocuments()/self.__totalDocumentsWithTerm(term))
     
 
@@ -72,13 +76,13 @@ class VectorSpaceModel:
             # if done like below, it can spot single syllables like "eg" which can
             # also be parts of words like "egg" or "leg"
             for word in query.split():
+            #  break after appending all the terms in the query
                 if len(np.nonzero(query_vector)) == len(query.split()):
                     break
                 if term == word:
                     found += 1
                     # print(f"Term {term} found {found} times in query")
             query_vector.append(found/len(query.split())*self.inverseDocumentFrequency(term))
-            #  break after appending len(query.split()) non zero columns
         sparse_query_vector = sp.sparse.csr_matrix(query_vector)
         return sparse_query_vector
 
@@ -102,19 +106,18 @@ class VectorSpaceModel:
 
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
-        document_mapper = []
-        # sort files by name
-        for file in sorted(os.listdir("data/docs/processed")):
-            document_mapper.append(file)
+        for i, file in enumerate(os.listdir("data/docs/processed")):
             document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
-            # print(f"Document vector for {file} generated")
-        return document_mapper
+            print(f"Document vector for {file} generated {i+1}/{len(os.listdir('data/docs/processed'))}")
+        print(document_vectors.shape)
+        document_vectors = document_vectors[1:]        
+        sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_lemma.npz'), document_vectors)
+        return document_vectors
     
     def getCosSimilarities(self, docs, query) -> np.array:
         dot_products = np.dot(docs, query.T)
-        norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
         dot_products = dot_products.flatten()
-        # norms = np.linalg.norm(docs) * np.linalg.norm(query)
+        norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
         cos_similarities = np.divide(dot_products, norms)
         return cos_similarities
     
@@ -145,9 +148,8 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-mapper = vsm.generateDocumentVectors()
-# print(len(mapper))
-sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
+vsm.generateDocumentVectors()
+sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_lemma.npz'))
 # print(sparse_matrix.shape)
 for file in sorted(os.listdir("data/Queries_Processed")):
     print(f"query file: {file}")
@@ -155,9 +157,8 @@ for file in sorted(os.listdir("data/Queries_Processed")):
         query = f.read()
         # print(query)
         query_vector = vsm.queryVector(query)
-        # exclude row 0 empty vector (don't know why)
-        cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
+        cos_similarities = vsm.getCosSimilarities(sparse_matrix.toarray(), query_vector.toarray())
         # print(cos_similarities.shape)
         for i in vsm.getTopKDocs(cos_similarities, 20):
-            print(f"{mapper[i]}: {cos_similarities[i]}")
+            print(f"{i}: {cos_similarities[i]}")
         print()
