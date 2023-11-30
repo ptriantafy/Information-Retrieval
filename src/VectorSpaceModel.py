@@ -102,10 +102,8 @@ class VectorSpaceModel:
 
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
-        # document_mapper = []
         # sort files by name --why?
         for file in os.listdir("data/docs/processed"):
-            # document_mapper.append(file)
             document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
             print(f"Document vector for {file} generated")
         document_vectors = np.delete(document_vectors, (0), axis=0)
@@ -149,23 +147,23 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-#doc_vec = vsm.generateDocumentVectors()
+# doc_vec = vsm.generateDocumentVectors()
 
-#sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), doc_vec)
+# sp.sparse.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), doc_vec)
 
 sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
 print(sparse_matrix.shape)
 print(vsm.getCosSimilarities(sparse_matrix.toarray()[1,:], sparse_matrix.toarray()[1,:]))
 
-# for file in sorted(os.listdir("data/Queries_Processed")):
-#     print(f"query file: {file}")
-#     with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
-#         query = f.read()
-#         # print(query)
-#         query_vector = vsm.queryVector(query)
-#         # exclude row 0 empty vector (don't know why)
-#         cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
-#         # print(cos_similarities.shape)
-#         for i in vsm.getTopKDocs(cos_similarities, 20):
-#             print(f"{mapper[i]}: {cos_similarities[i]}")
-#         print()
+for file in sorted(os.listdir("data/Queries_Processed")):
+    print(f"query file: {file}")
+    with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
+        query = f.read()
+        # print(query)
+        query_vector = vsm.queryVector(query)
+        # exclude row 0 empty vector (don't know why)
+        cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray(), query_vector.tocsr().toarray())
+        # print(cos_similarities.shape)
+        for i in vsm.getTopKDocs(cos_similarities, 20):
+            print(f"{i}: {cos_similarities[i]}")
+        # print()

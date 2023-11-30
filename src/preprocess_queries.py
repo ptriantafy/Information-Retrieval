@@ -17,7 +17,7 @@ stemmer = nltk.stem.PorterStemmer()
 with open(os.path.join('data/queries_processed.txt'), 'r') as f:
     for i, line in enumerate(f.readlines()):
         text = ' '.join([stemmer.stem(word) for word in line.split()])
-        with open(os.path.join('data/docs/processed', 'query_' + str(i+1) + '.txt'), 'w+') as f:
+        with open(os.path.join('data/Queries_Processed/', 'query_' + str(i+1) + '.txt'), 'w+') as f:
             f.write(text)
 
 
