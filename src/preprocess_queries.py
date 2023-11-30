@@ -7,16 +7,16 @@ stop_words = nltk.corpus.stopwords.words('english')
 text = ''
 with open(os.path.join('data/queries.txt'), 'r') as f:
     for line in f.readlines():
-        text += ' '.join([word for word in line.split() if word not in stop_words])
+        text += ' '.join([word.lower() for word in line.split() if word.lower() not in stop_words])
         text += '\n'
 with open(os.path.join('data/queries_processed.txt'), 'w+') as f:
     f.write(text)
 
 # stem and save each query in a separate file
-stemmer = nltk.stem.PorterStemmer()
+lemmatizer = nltk.stem.WordNetLemmatizer()
 with open(os.path.join('data/queries_processed.txt'), 'r') as f:
     for i, line in enumerate(f.readlines()):
-        text = ' '.join([stemmer.stem(word) for word in line.split()])
+        text = ' '.join([lemmatizer.lemmatize(word) for word in line.split()])
         with open(os.path.join('data/Queries_Processed/', 'query_' + str(i+1) + '.txt'), 'w+') as f:
             f.write(text)
 
