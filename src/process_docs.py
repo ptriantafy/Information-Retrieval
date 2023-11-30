@@ -17,7 +17,7 @@ for file in os.listdir('data/docs/processed'):
     text = ' '.join([word for word in text.split() if word not in stop_words])
     with open(os.path.join('data/docs/processed', file), 'w+') as f:
         f.write(text)
-
+        
 # stem all txt files in data/docs/raw and save them in data/docs/processed
 stemmer = nltk.stem.PorterStemmer()
 for file in os.listdir('data/docs/raw'):
