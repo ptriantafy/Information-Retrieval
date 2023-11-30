@@ -3,7 +3,6 @@ import scipy as sp
 import os
 import InvertedIndex 
 import time
-import concurrent.futures
 # import pandas as pd
 
 class VectorSpaceModel:
@@ -23,16 +22,16 @@ class VectorSpaceModel:
     
 
 
-    def __count_term_occurrences(self, term, document):
-        try:
-            return len(self.inverted_index[term][document])
-        except:
-            return 0
-
-    def __totalTermsInDocument(self, document) -> int:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            total_terms = sum(executor.map(lambda term: self.__count_term_occurrences(term, document), self.inverted_index))
+    def __totalTermsInDocument(self,document) -> int:
+        inverted_index = self.inverted_index
+        total_terms = 0
+        for term in inverted_index:
+            try:
+                total_terms += len(inverted_index[term][document])
+            except:
+                pass
         return total_terms
+
 
     def __totalDocumentsWithTerm(self,term) -> int:
         inverted_index = self.inverted_index
