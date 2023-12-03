@@ -2,6 +2,7 @@ import numpy as np
 import scipy as sp
 import os
 import InvertedIndex 
+import time
 # import pandas as pd
 
 class VectorSpaceModel:
@@ -22,14 +23,7 @@ class VectorSpaceModel:
 
 
     def __totalTermsInDocument(self,document) -> int:
-        inverted_index = self.inverted_index
-        total_terms = 0
-        for term in inverted_index:
-            try:
-                total_terms += len(inverted_index[term][document])
-            except:
-                pass
-        return total_terms
+        return len(document.split())
 
 
 
@@ -51,6 +45,7 @@ class VectorSpaceModel:
 
     #///////////// Public Methods ///////////////
     def termFrequency(self,term, document) -> float:
+        
         return self.__termOccurancesInDocument(term,document)/self.__totalTermsInDocument(document)
     
 
@@ -100,14 +95,29 @@ class VectorSpaceModel:
         return sparse_document_vector
     
 
+    def documentVectorChad(self,document) -> np.array:
+        
+        inverted_index = self.inverted_index
+        inverted_index_length = len(inverted_index) 
+        document_vector = np.zeros(inverted_index_length)
+        with open(os.path.join(os.path.dirname(__file__), '../data/docs/processed', document), 'r') as f:
+            doc = f.read()
+            for term in set(doc.split()): #///TODO split once
+                #if the term is in the document, add its score to the document vector
+                document_vector[list(inverted_index.keys()).index(term)] = self.termScore(term,document)
+
+
+        sparse_document_vector = sp.sparse.csr_matrix(document_vector)
+        return sparse_document_vector
+
     def generateDocumentVectors(self) -> np.array:
         document_vectors = []
         document_mapper = []
         # sort files by name
         for file in sorted(os.listdir("data/docs/processed")):
             document_mapper.append(file)
-            document_vectors = sp.sparse.vstack((document_vectors, self.documentVector(file)))
-            # print(f"Document vector for {file} generated")
+            document_vectors = sp.sparse.vstack((document_vectors, self.documentVectorChad(file)))
+            print(f"Document vector for {file} generated")
         return document_mapper
     
     def getCosSimilarities(self, docs, query) -> np.array:
@@ -120,6 +130,11 @@ class VectorSpaceModel:
     
     def getTopKDocs(self, cos_similarities, k) -> np.array:
         return np.argsort(cos_similarities.flatten())[-k:][::-1]
+    
+    def test(self):
+        start_time = time.time()
+        self.generateDocumentVectors()
+        print("--- %f seconds ---" % (time.time() - start_time))
     #Following functions are used for debugging purposes
     # def count_unique_words(self, file_path = "data/docs/processed/00001.txt"):
     #     unique_words = set()
@@ -145,19 +160,20 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-mapper = vsm.generateDocumentVectors()
-# print(len(mapper))
-sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
-# print(sparse_matrix.shape)
-for file in sorted(os.listdir("data/Queries_Processed")):
-    print(f"query file: {file}")
-    with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
-        query = f.read()
-        # print(query)
-        query_vector = vsm.queryVector(query)
-        # exclude row 0 empty vector (don't know why)
-        cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
-        # print(cos_similarities.shape)
-        for i in vsm.getTopKDocs(cos_similarities, 20):
-            print(f"{mapper[i]}: {cos_similarities[i]}")
-        print()
+vsm.test()
+# mapper = vsm.generateDocumentVectors()
+# # print(len(mapper))
+# sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
+# # print(sparse_matrix.shape)
+# for file in sorted(os.listdir("data/Queries_Processed")):
+#     print(f"query file: {file}")
+#     with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
+#         query = f.read()
+#         # print(query)
+#         query_vector = vsm.queryVector(query)
+#         # exclude row 0 empty vector (don't know why)
+#         cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
+#         # print(cos_similarities.shape)
+#         for i in vsm.getTopKDocs(cos_similarities, 20):
+#             print(f"{mapper[i]}: {cos_similarities[i]}")
+#         print()
