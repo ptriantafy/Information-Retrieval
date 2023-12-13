@@ -78,7 +78,7 @@ class VectorSpaceModel:
         inverted_index = self.inverted_index
         inverted_index_length = len(inverted_index) 
         document_vector = np.zeros(inverted_index_length)
-        with open(os.path.join(os.path.dirname(__file__), '../data/docs/processed', document), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../../data/docs/processed', document), 'r') as f:
             doc = f.read()
             for term in set(doc.split()): #///TODO split once
                 #if the term is in the document, add its score to the document vector
@@ -137,24 +137,24 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-vsm.generateDocumentVectors(True)
+# vsm.generateDocumentVectors(True)
 # print(len(mapper))
 list_of_files = sorted(os.listdir("data/docs/processed"))
-sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'))
+sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), '../tmp/document_vectors.npz'))
 # print(sparse_matrix.shape)
-with open(os.path.join(os.path.dirname(__file__), 'tmp/results.txt'), 'w+') as f:
+with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'w+') as f:
     f.write("")
 for file in (os.listdir("data/Queries_Processed")):
     print(f"query file: {file}")
-    with open(os.path.join(os.path.dirname(__file__), '../data/Queries_Processed', file), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), '../../data/Queries_Processed', file), 'r') as f:
         query = f.read()
-        with open(os.path.join(os.path.dirname(__file__), 'tmp/results.txt'), 'a') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'a') as f:
             f.write(f"\nquery file: {file}\n")
         query_vector = vsm.queryVector(query)
         cos_similarities = vsm.getCosSimilarities(sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
         # print(cos_similarities.shape)
         for order, i in enumerate(vsm.getTopKDocs(cos_similarities, 20)):
             print(f"{order+1}. {list_of_files[i]}: {cos_similarities[i]}")
-            with open(os.path.join(os.path.dirname(__file__), 'tmp/results.txt'), 'a') as f:
+            with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'a') as f:
                 f.write(f"{order+1}.  {list_of_files[i]}: {cos_similarities[i]}\n")
         print()
