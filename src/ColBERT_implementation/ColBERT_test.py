@@ -12,7 +12,7 @@ queries = Queries(path=queries)
 collection = Collection(path=collection)
 print (f'Loaded {len(queries)} queries and {len(collection):,} passages')
 
-if __name__ == '__main__': #without this it won't run...
+if __name__ == '__main__':  
     with Run().context(RunConfig(nranks=1, experiment="cfcollection")):
         config = ColBERTConfig(
             nbits=2,
