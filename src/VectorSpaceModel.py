@@ -146,7 +146,7 @@ class VectorSpaceModel:
 
 #///////main testing script///////
 vsm = VectorSpaceModel()
-file_names = vsm.generateDocumentVectors()
+# file_names = vsm.generateDocumentVectors()
 sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors_stem.npz'))
 # print(sparse_matrix.shape)
 for file in sorted(os.listdir("data/Queries_Processed")):
