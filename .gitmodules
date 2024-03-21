@@ -1,0 +1,3 @@
+[submodule "src/ColBERT"]
+	path = src/ColBERT
+	url = ../../stanford-futuredata/ColBERT.git
