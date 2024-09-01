@@ -42,12 +42,8 @@ class VectorSpaceModel:
         '''
         Returns total number of documents inside the specified path
         '''
-        files = os.listdir(folder_path)
 
-        # Filter files that end with '.txt'
-        txt_files = [file for file in files if file.endswith('.txt')]
-
-        return len(txt_files)
+        return len(self.list_of_docs)
     
 
     #///////////// Public Methods ///////////////
@@ -68,33 +64,50 @@ class VectorSpaceModel:
         return self.term_frequency(term,document)*self.inverse_document_frequency(term)
 
 
-    def query_vector(self, query:str) -> np.array:
+
+    def vectorize(self, file_path: str) -> np.array:
+        '''
+        Converts a text (query or document content) to a vector.
+        '''
+
+        with open(file_path, 'r') as f:
+            text = f.read()
+        
+            inverted_index = self.inverted_index
+            vector = np.zeros(len(inverted_index))
+            terms = text.split()
+            unique_terms = set(terms)
+            
+            for term in unique_terms:
+                try:
+                    vector[list(inverted_index.keys()).index(term)] = self.term_score(term, os.path.basename(file_path))
+                except ValueError:
+                    print(f"Term {term} not found in the inverted index")
+        
+        sparse_vector = sp.sparse.csr_matrix(vector)
+        return sparse_vector
+
+
+
+    def query_vectorize(self, file_path:str) -> np.array:
+        ''''''
         # start_time = time.time()
-        inverted_index = self.inverted_index
-        query_vector = np.zeros(len(inverted_index))
-        for term in set(query.split()):
-            try:
-                tf = 1/len(query.split())
-                # tf = (1 + np.log(query.split().count(term)/len(query.split()))) #normalized
-                query_vector[list(inverted_index.keys()).index(term)] = self.inverse_document_frequency(term) * tf
-            except:
-                pass
+        with open(file_path, 'r') as f:
+            query = f.read()
+            inverted_index = self.inverted_index
+            query_vector = np.zeros(len(inverted_index))
+            words = query.split()
+            for term in set(words):
+                try:
+                    tf = words.count(term)/len(words)
+                    # tf = (1 + np.log(query.split().count(term)/len(query.split()))) #normalized
+                    query_vector[list(inverted_index.keys()).index(term)] = self.inverse_document_frequency(term) * tf
+                except:
+                    pass
+
         sparse_query_vector = sp.sparse.csr_matrix(query_vector)
         # print("--- %f seconds to create vector---" % (time.time() - start_time))
         return sparse_query_vector
-
-
-    def document_vector(self,file_path:str ) -> np.array:
-        inverted_index = self.inverted_index
-        inverted_index_length = len(inverted_index) 
-        document_vector = np.zeros(inverted_index_length)
-        with open(file_path, 'r') as f:
-            doc = f.read()
-            for term in set(doc.split()): #///TODO split once
-                #if the term is in the document, add its score to the document vector
-                document_vector[list(inverted_index.keys()).index(term)] = self.term_score(term,os.path.basename(file_path))
-        sparse_document_vector = sp.sparse.csr_matrix(document_vector)
-        return sparse_document_vector
 
 
     def generate_document_vectors(self,file_path:str,save_to_npz:bool = False, save_path = 'saves/document_sparse_vectors.npz') -> sp.sparse.csr_matrix:
@@ -104,7 +117,8 @@ class VectorSpaceModel:
         document_vectors = sp.sparse.csr_matrix((0, len(self.inverted_index)))  # Initialize an empty sparse matrix
         # sort files by name
         for file in self.list_of_docs:
-            document_vectors = sp.sparse.vstack((document_vectors, self.document_vector(os.path.join(file_path, file))))
+            vec = self.vectorize(os.path.join(file_path, file))
+            document_vectors = sp.sparse.vstack((document_vectors,vec))
             print(f"Document vector for {file} generated")
         if save_to_npz:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -114,12 +128,13 @@ class VectorSpaceModel:
     
     #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    def get_cos_similarities(self, docs:str, query:str) -> np.array:
+    def get_cos_similarities(self, docs:sp.sparse.csr_matrix, query:sp.sparse.csr_matrix) -> np.array:
        
         dot_products = np.dot(docs, query.T).flatten()
         norms = np.linalg.norm(docs, axis=1) * np.linalg.norm(query)
+
         cos_similarities = np.abs(np.divide(dot_products, norms))
-     
+
         return cos_similarities
     
     
@@ -164,7 +179,7 @@ class VectorSpaceModel:
         print("--- %f seconds ---" % (time.time() - start_time))
 
 
-    def load_precomputed_vsm(self, path_to_file:str = '../tmp/document_vectors.npz') -> sp.sparse.csr_matrix:
+    def load_precomputed_vsm(self, path_to_file:str = 'saves/document_vectors.npz' ) -> sp.sparse.csr_matrix:
         '''
         Loads the precomputed document vectors from a .npz file 
         '''
@@ -172,25 +187,36 @@ class VectorSpaceModel:
         return docs_sparse_matrix
 
 
-    def print_results(self):
+    def compare_queries(self, queries_path:str = 'data/queries/normalized', docs_sparse_matrix:sp.sparse.csr_matrix = None):
+        '''
+        Compares the queries in the queries_path to the documents in the docs_sparse_matrix
+        '''
+        results = []
+        # with open(os.path.join(os.path.dirname(__file__), '../res/results.txt'), 'w+') as f:
+        #     f.write("") # clear results.txt
+        for query in (os.listdir(queries_path)):
 
-        docs_sparse_matrix = self.load_precomputed_vsm()
-        with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'w+') as f:
-            f.write("") # clear results.txt
-        for file in (os.listdir("data/Queries_Processed")):
-            print(f"query file: {file}")
-            with open(os.path.join(os.path.dirname(__file__), '../../data/Queries_Processed', file), 'r') as f:
-                query = f.read()
-                with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'a') as f:
-                    f.write(f"\nquery file: {file}\n")
-                query_vector = self.query_vector(query)
+            results.append(f"\nquery file: {query}\n")
+
+            with open(os.path.join(queries_path, query), 'r') as f:
+                query_vector = self.query_vectorize(os.path.join(queries_path, query))
                 cos_similarities = self.get_cos_similarities(docs_sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
                 # print documents in a pretty manner and write them in results.txt
                 for order, i in enumerate(self.get_top_k_indices(cos_similarities, 20)):
-                    print(f"{order+1}. {self.list_of_docs[i]}: {cos_similarities[i]}")
-                    with open(os.path.join(os.path.dirname(__file__), '../tmp/results.txt'), 'a') as f:
-                        f.write(f"{order+1}.  {self.list_of_docs[i]}: {cos_similarities[i]}\n")
-                print()
+                    results.append(f"{order+1}.  {self.list_of_docs[i]}: {cos_similarities[i]}\n")
+            results.append("\n")
+        #Terminal print 
+        output = ''.join(results)
+        print(output)
+
+        file_path = os.path.join(os.path.dirname(__file__), '../../data/results/vsm_results.txt')
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # Write to the file
+        with open(file_path, 'w+') as f:
+            f.write(output)
 
 
     def extract_relevant(self, file_index:int):
@@ -263,24 +289,20 @@ class VectorSpaceModel:
                 print(query_number,precision)
 
 
-    def print_metrics(self):
-        docs_sparse_matrix = self.load_precomputed_vsm()
-        with open(os.path.join(os.path.dirname(__file__), '../tmp/metrics.txt'), 'w+') as f:
+    def print_metrics(self,docs_sparse_matrix:sp.sparse.csr_matrix ):
+        with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'w+') as f:
             f.write("")
-        for file in (os.listdir("data/Queries_Processed")):
-            print(f"query file: {file}")
-            with open(os.path.join(os.path.dirname(__file__), '../../data/Queries_Processed', file), 'r') as f:
-                query = f.read()
-                with open(os.path.join(os.path.dirname(__file__), '../tmp/metrics.txt'), 'a') as f:
-                    f.write(f"\nquery file: {file}\n")
-                query_vector = self.query_vector(query)
+        for query in (os.listdir('data/queries/normalized')):
+            print(f"query file: {query}")
+            with open(os.path.join('data/queries/normalized', query), 'r') as f:
+                with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
+                    f.write(f"\nquery file: {query}\n")
+                query_vector = self.query_vectorize(os.path.join('data/queries/normalized', query))
                 cos_similarities = self.get_cos_similarities(docs_sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
                 pred_relev = self.get_top_k_indices(cos_similarities, 20)
                 pred_relev = self.index_to_doc(pred_relev)
                 pred_relev = self.extract_doc_id(pred_relev)
-                true_relev = self.extract_relevant(self.extract_doc_id(file))
-                print(f"True relevant: {true_relev}")
-                print(f"Predicted relevant: {pred_relev}")
+                true_relev = self.extract_relevant(self.extract_doc_id(query))
                 precision = self.precision(pred_relev, true_relev)
                 recall = self.recall(pred_relev, true_relev)
                 precision_at_5 = self.precision_at_k(pred_relev, true_relev, 5)
@@ -288,7 +310,7 @@ class VectorSpaceModel:
                 precision_at_20 = self.precision_at_k(pred_relev, true_relev, 20)
                 harmonic_mean = self.harmonic_mean(precision, recall)
                 reciproral_ranking = self.reciproral_ranking(pred_relev, true_relev)
-                with open(os.path.join(os.path.dirname(__file__), '../tmp/metrics.txt'), 'a') as f:
+                with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
                     f.write(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
                 print(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
                 print()
