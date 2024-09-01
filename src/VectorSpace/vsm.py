@@ -1,17 +1,15 @@
 import numpy as np
 import scipy as sp
 import os
-import InvertedIndex 
 import time
 import re
 import ast
 
 class VectorSpaceModel:
 
-    def __init__(self) -> None:
-        ii_obj = InvertedIndex.InvertedIndex()
-        self.inverted_index = ii_obj.generateInvertedIndex(True)
-        self.list_of_docs = sorted(os.listdir("data/docs/processed"))        
+    def __init__(self, inverted_index: dict, file_path:str = "data/docs/normalized") -> None:
+        self.inverted_index = inverted_index
+        self.list_of_docs = sorted(os.listdir(file_path))  
 
 
     #///////////// Private Methods ///////////////
@@ -40,7 +38,7 @@ class VectorSpaceModel:
         return len(inverted_index[term])
     
 
-    def __total_documents(self,folder_path:str = "data/docs/processed") -> int:
+    def __total_documents(self,folder_path:str = "data/docs/normalized") -> int:
         '''
         Returns total number of documents inside the specified path
         '''
@@ -55,6 +53,7 @@ class VectorSpaceModel:
     #///////////// Public Methods ///////////////
     def term_frequency(self,term:str, document:str) -> float:
         '''Calculates the t_f parameter for a specific term and document'''
+        
         return self.__term_occurances_in_document(term,document)/self.__total_terms_in_document(document)
         # return 1 + np.log(self.__term_occurances_in_document(term,document)/self.__total_terms_in_document(document)) #normalized
     
@@ -85,28 +84,32 @@ class VectorSpaceModel:
         return sparse_query_vector
 
 
-    def document_vector(self,document:str) -> np.array:
+    def document_vector(self,file_path:str ) -> np.array:
         inverted_index = self.inverted_index
         inverted_index_length = len(inverted_index) 
         document_vector = np.zeros(inverted_index_length)
-        with open(os.path.join(os.path.dirname(__file__), '../../data/docs/processed', document), 'r') as f:
+        with open(file_path, 'r') as f:
             doc = f.read()
             for term in set(doc.split()): #///TODO split once
                 #if the term is in the document, add its score to the document vector
-                document_vector[list(inverted_index.keys()).index(term)] = self.term_score(term,document)
+                document_vector[list(inverted_index.keys()).index(term)] = self.term_score(term,os.path.basename(file_path))
         sparse_document_vector = sp.sparse.csr_matrix(document_vector)
         return sparse_document_vector
 
 
-    def generate_document_vectors(self,save_to_npz:bool = False) -> sp.sparse.csr_matrix:
-        document_vectors = sp.csr_matrix((0, len(self.inverted_index)))  # Initialize an empty sparse matrix
+    def generate_document_vectors(self,file_path:str,save_to_npz:bool = False, save_path = 'saves/document_sparse_vectors.npz') -> sp.sparse.csr_matrix:
+        '''
+        This the main VSM generator funcion. Generates the document vectors for all the documents in the file_path
+        '''
+        document_vectors = sp.sparse.csr_matrix((0, len(self.inverted_index)))  # Initialize an empty sparse matrix
         # sort files by name
         for file in self.list_of_docs:
-            document_vectors = sp.vstack((document_vectors, self.document_cector(file)))
+            document_vectors = sp.sparse.vstack((document_vectors, self.document_vector(os.path.join(file_path, file))))
             print(f"Document vector for {file} generated")
         if save_to_npz:
-            print("Saving document vectors to tmp/document_vectors.npz")
-            sp.save_npz(os.path.join(os.path.dirname(__file__), 'tmp/document_vectors.npz'), document_vectors)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            print("Saving document vectors to: ",save_path)
+            sp.sparse.save_npz(save_path, document_vectors)
         return document_vectors
     
     #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,7 +294,7 @@ class VectorSpaceModel:
                 print()
 #///////main testing script///////
 
-vsm = VectorSpaceModel()
-# vsm.print_metrics()
-# vsm.print_results() 
-vsm.colbert_metrics()
+# vsm = VectorSpaceModel()
+# # vsm.print_metrics()
+# # vsm.print_results() 
+# vsm.colbert_metrics()

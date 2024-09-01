@@ -15,7 +15,7 @@ class InvertedIndex:
         pass
 
 
-    def generateInvertedIndex(self,file_path:str, export:bool = False, save_path:str = None)->dict:
+    def generate_inverted_index(self,file_path:str, export:bool = False, save_path:str = None)->dict:
         
         inverted_index = {}
 
@@ -37,37 +37,38 @@ class InvertedIndex:
                         else:
                             inverted_index[word][file].append(i)
         if export:
-            self.__exportInvertedIndex()
+            if not save_path:
+                save_path = os.path.join(file_path, '../..')
+            os.makedirs(save_path, exist_ok=True)
+
+            self.__export_inverted_index(inverted_index, os.path.join(save_path, 'inverted_index.txt'))
 
         return inverted_index
 
 
-    def importInvertedIndex(self, file_path:str)->dict:
+    def import_inverted_index(self, file_path: str) -> dict:
         inverted_index = {}
         with open(file_path, 'r') as f:
-            for line in f.readlines():
-                word, files = line.split(':')
-                files = files.split(' ')
-                for i in range(0, len(files), 2):
-                    file = files[i][1:]
-                    position = files[i+1][:-1]
-                    if word not in inverted_index:
-                        inverted_index[word] = {file: [position]}
-                    else:
-                        if file not in inverted_index[word]:
-                            inverted_index[word][file] = [position]
+            for line in f:
+                word, files = line.split(': ')
+                files = files.strip().split(') ')
+                for file_position in files:
+                    if file_position:
+                        file_position = file_position.replace('(', '').replace(')', '')
+                        file, position = file_position.split(', ')
+                        if word not in inverted_index:
+                            inverted_index[word] = {file: [position]}
                         else:
-                            inverted_index[word][file].append(position)
+                            if file not in inverted_index[word]:
+                                inverted_index[word][file] = [position]
+                            else:
+                                inverted_index[word][file].append(position)
         return inverted_index
 
     
-    def __exportInvertedIndex(self, save_path:str)->None:
+    def __export_inverted_index(self,inverted_index:dict ,save_path:str)->None:
         
-        inverted_index = self.inverted_index
-
-        os.makedirs(save_path, exist_ok=True)
-
-        with open('data/inverted_index.txt', 'w+') as f:
+        with open(save_path, 'w') as f:
             for i, word in enumerate(inverted_index):
                 f.write(f"{word}: ")
                 for file in inverted_index[word]:
@@ -86,6 +87,10 @@ class Preprocessing:
         except LookupError:
             nltk.download('stopwords')
 
+        try:
+            nltk.data.find('wordnet')
+        except LookupError:
+            nltk.download('wordnet')
         
     def save_queries_separately(self, file_path:str, save_path:str = None)->None:
         """
@@ -118,6 +123,8 @@ class Preprocessing:
 
         # read all txt files in specified folder and flatten them
         for file in os.listdir(file_path):
+            if file == '.gitignore':
+                continue
             with open(os.path.join(file_path, file), 'r') as f:
                 text = f.read().replace('\n', ' ')
             with open(os.path.join(save_path, file), 'w') as f:
@@ -138,6 +145,8 @@ class Preprocessing:
 
         # remove stop words from specified files
         for file in os.listdir(file_path):
+            if file == '.gitignore':
+                continue
             with open(os.path.join(file_path, file), 'r') as f:
                 text = f.read().lower()
             text = ' '.join([word for word in text.split() if word not in stop_words])
@@ -157,6 +166,8 @@ class Preprocessing:
 
         stem_lem = normalisation_function
         for file in os.listdir(file_path):
+            if file == '.gitignore':
+                continue
             with open(os.path.join(file_path, file), 'r') as f:
                 text = f.read()
             text = ' '.join([stem_lem(word) for word in text.split()])
@@ -170,13 +181,10 @@ class Preprocessing:
 
 
 
-preproc = Preprocessing()
-preproc.flatten_text('data/docs/raw')
-preproc.remove_stop_words('data/docs/flattened')
-preproc.normalise_text(STEM, 'data/docs/no_stop_words')
 
-preproc.save_queries_separately('data/queries/queries.txt')
 
-preproc.flatten_text('data/queries/raw')
-preproc.remove_stop_words('data/queries/flattened')
-preproc.normalise_text(STEM, 'data/queries/no_stop_words')
+# preproc.save_queries_separately('data/queries/queries.txt')
+
+# preproc.flatten_text('data/queries/raw')
+# preproc.remove_stop_words('data/queries/flattened')
+# preproc.normalise_text(STEM, 'data/queries/no_stop_words')
