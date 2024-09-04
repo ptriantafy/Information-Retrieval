@@ -3,16 +3,59 @@ import scipy as sp
 import os
 import time
 import re
-import ast
+import math
+
 
 class VectorSpaceModel:
+
+    
 
     def __init__(self, inverted_index: dict, file_path:str = "data/docs/normalized") -> None:
         self.inverted_index = inverted_index
         self.list_of_docs = sorted(os.listdir(file_path))  
+        self.file_path = file_path
+        self.TF_MODE = 3
+        self.IDF_MODE = 3
 
 
     #///////////// Private Methods ///////////////
+
+    def __binary_tf(self,frequency):
+        return 1 if frequency > 0 else 0
+
+
+    def __raw_tf(self,frequency):
+        return frequency
+
+   
+    def __log_tf(self,frequency):
+        return 1 + math.log(frequency) if frequency > 0 else 0
+
+
+    def __double_normalization_tf(self,frequency, max_frequency):
+        return 0.5 + 0.5 * (frequency / max_frequency) if max_frequency > 0 else 0
+
+
+    def __k_normalization_tf(self,frequency, max_frequency, K=0.5):
+        return K + (1 - K) * (frequency / max_frequency) if max_frequency > 0 else 0
+
+
+    def __idf_mono(self):
+        return 1
+
+
+    def __idf_inverse(self,n_docs, doc_freq):
+        return math.log(n_docs / doc_freq) if doc_freq > 0 else 0
+
+
+    def __idf_log(self,n_docs, doc_freq):
+        return math.log(1 + (n_docs / doc_freq)) if doc_freq > 0 else 0
+
+
+    def __idf_max_inverse(self,n_docs, doc_freq, max_freq):
+        return math.log(1 + (max_freq / doc_freq)) if doc_freq > 0 else 0
+
+
     def __term_occurances_in_document(self,term:str, document:str) -> int:
         '''
         Find term occurances per document. Uses the InvertedIndex class to look up the index
@@ -38,32 +81,99 @@ class VectorSpaceModel:
         return len(inverted_index[term])
     
 
-    def __total_documents(self,folder_path:str = "data/docs/normalized") -> int:
+    def __total_documents(self) -> int:
         '''
         Returns total number of documents inside the specified path
         '''
-
         return len(self.list_of_docs)
     
+
+    def __get_max_frequency(self,document:str) -> str:
+        '''
+        Returns the maximum frequency of a term in a document
+        '''
+        with open(os.path.join(self.file_path, document), 'r') as f:    
+            doc = f.read()
+            max_frequency = 0
+            for term in set(doc.split()):
+                max_f_tmp = self.__term_occurances_in_document(term,document)
+                if max_f_tmp > max_frequency:
+                    max_frequency = max_f_tmp
+            return max_frequency
+
 
     #///////////// Public Methods ///////////////
     def term_frequency(self,term:str, document:str) -> float:
         '''Calculates the t_f parameter for a specific term and document'''
-        
-        return self.__term_occurances_in_document(term,document)/self.__total_terms_in_document(document)
-        # return 1 + np.log(self.__term_occurances_in_document(term,document)/self.__total_terms_in_document(document)) #normalized
+        mode = self.TF_MODE
+        if mode == 0:
+            return self.__term_occurances_in_document(term,document)/self.__total_terms_in_document(document)
+        if mode == 1:
+            return self.__binary_tf(self.__term_occurances_in_document(term,document))
+        elif mode == 2:
+            return self.__raw_tf(self.__term_occurances_in_document(term,document))
+        elif mode == 3:
+            return self.__log_tf(self.__term_occurances_in_document(term,document))
+        elif mode == 4:
+            max_frequency = self.__get_max_frequency(document)
+            return self.__double_normalization_tf(self.__term_occurances_in_document(term,document), max_frequency)
+        elif mode == 5:
+            max_frequency = self.__get_max_frequency(document)
+            return self.__k_normalization_tf(self.__term_occurances_in_document(term,document), max_frequency)
     
 
     def inverse_document_frequency(self,term:str) -> float:
         '''Calculates the idf '''
-        return np.log(self.__total_documents()/self.__total_documents_with_term(term))
-        # return np.log(1 + self.__total_documents()/self.__total_documents_with_term(term)) #normalized
+        mode = self.IDF_MODE
+        if mode == 0:
+            return np.log(self.__total_documents()/self.__total_documents_with_term(term))
+        if mode == 1:
+            return self.__idf_mono()
+        if mode == 2:
+            return self.__idf_inverse(self.__total_documents(), self.__total_documents_with_term(term))
+        if mode == 3:
+            return self.__idf_log(self.__total_documents(), self.__total_documents_with_term(term))
+        if mode == 4:
+            try:
+                max_frequency = max([self.__term_occurances_in_document(term,doc) for doc in self.list_of_docs])
+            except:
+                max_frequency = 0
+            return self.__idf_max_inverse(self.__total_documents(), self.__total_documents_with_term(term), max_frequency)
+        
 
 
     def term_score(self,term: str,document: str) -> float:
         return self.term_frequency(term,document)*self.inverse_document_frequency(term)
 
 
+    def optimize(self):
+        for i in range(0,6):
+            for j in range(0,5):
+                # try:
+                    
+                    avg_f_measure = 0
+                    self.TF_MODE = i
+                    self.IDF_MODE = j
+                    sp_matrix = self.generate_document_vectors(os.path.join(os.path.dirname(__file__),'../../data/docs/normalized'))
+                    for query in (os.listdir('data/queries/normalized')):
+                        with open(os.path.join('data/queries/normalized', query), 'r') as f:
+                            query_vector = self.query_vectorize(os.path.join('data/queries/normalized', query))
+                            cos_similarities = self.get_cos_similarities(sp_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
+                            pred_relev = self.get_top_k_indices(cos_similarities, 20)
+                            pred_relev = self.index_to_doc(pred_relev)
+                            pred_relev = self.extract_doc_id(pred_relev)
+                            true_relev = self.extract_relevant(self.extract_doc_id(query))
+                            precision = self.precision(pred_relev, true_relev)
+                            recall = self.recall(pred_relev, true_relev)
+                            f_measure = self.harmonic_mean(precision, recall)
+                            avg_f_measure += f_measure
+                    avg_f_measure = avg_f_measure/19
+                    print(f"Average f measure for tf mode {i} and idf mode {j} is {avg_f_measure}")
+                # except:
+                #     print(f"Error with tf mode {i} and idf mode {j}")
+                #     continue
+                
+        
 
     def vectorize(self, file_path: str) -> np.array:
         '''
@@ -86,7 +196,6 @@ class VectorSpaceModel:
         
         sparse_vector = sp.sparse.csr_matrix(vector)
         return sparse_vector
-
 
 
     def query_vectorize(self, file_path:str) -> np.array:
@@ -119,7 +228,7 @@ class VectorSpaceModel:
         for file in self.list_of_docs:
             vec = self.vectorize(os.path.join(file_path, file))
             document_vectors = sp.sparse.vstack((document_vectors,vec))
-            print(f"Document vector for {file} generated")
+            # print(f"Document vector for {file} generated")
         if save_to_npz:
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             print("Saving document vectors to: ",save_path)
@@ -171,8 +280,6 @@ class VectorSpaceModel:
             return [self.extract_doc_id(f) for f in file]
 
 
-
-
     def test_time(self,func:callable): #///TODO make it take fumction arguments
         start_time = time.time()
         func()
@@ -185,6 +292,8 @@ class VectorSpaceModel:
         '''
         docs_sparse_matrix = sp.sparse.load_npz(os.path.join(os.path.dirname(__file__), path_to_file ))
         return docs_sparse_matrix
+
+
 
 
     def compare_queries(self, queries_path:str = 'data/queries/normalized', docs_sparse_matrix:sp.sparse.csr_matrix = None):
@@ -267,31 +376,14 @@ class VectorSpaceModel:
             return 0
         return 2*(precision*recall)/(precision + recall)
     
-
-    def colbert_metrics(self, file_path:str = '../tmp/colbert_results.txt'):
-        '''
-        Calculates the metrics for the colbert results
-        '''
-    
-        with open(os.path.join(os.path.dirname(__file__),file_path), 'r') as file:
-            for line in file:
-                parts = line.strip().split('\t')
-                query_number = int(parts[0])
-                pred_docs = ast.literal_eval(parts[1])
-
-                docs = self.extract_doc_id(self.index_to_doc(pred_docs))
-                relevant_docs = self.extract_relevant(query_number)
-                p_at_k = self.precision_at_k(pred_docs, relevant_docs, 20)
-                reciprocal_rank = self.reciproral_ranking(pred_docs, relevant_docs)
-                recall = self.recall(pred_docs, relevant_docs)
-                precision = self.precision(docs, relevant_docs)
-                harmonic_mean = self.harmonic_mean(precision, recall)
-                print(query_number,precision)
-
-
     def print_metrics(self,docs_sparse_matrix:sp.sparse.csr_matrix ):
         with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'w+') as f:
             f.write("")
+        average_p_at_5 = 0
+        average_p_at_10 = 0
+        average_p_at_20 = 0
+        m_r_r = 0
+        average_f_score = 0
         for query in (os.listdir('data/queries/normalized')):
             print(f"query file: {query}")
             with open(os.path.join('data/queries/normalized', query), 'r') as f:
@@ -310,13 +402,20 @@ class VectorSpaceModel:
                 precision_at_20 = self.precision_at_k(pred_relev, true_relev, 20)
                 harmonic_mean = self.harmonic_mean(precision, recall)
                 reciproral_ranking = self.reciproral_ranking(pred_relev, true_relev)
+                average_p_at_5 += precision_at_5
+                average_p_at_10 += precision_at_10
+                average_p_at_20 += precision_at_20
+                m_r_r += reciproral_ranking
+                average_f_score += harmonic_mean
                 with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
                     f.write(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
                 print(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
                 print()
-#///////main testing script///////
-
-# vsm = VectorSpaceModel()
-# # vsm.print_metrics()
-# # vsm.print_results() 
-# vsm.colbert_metrics()
+        average_p_at_5 = average_p_at_5/19
+        average_p_at_10 = average_p_at_10/19
+        average_p_at_20 = average_p_at_20/19
+        m_r_r = m_r_r/19
+        average_f_score = average_f_score/19
+        with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
+            f.write(f"\nAverage precision at 5: {average_p_at_5}\nAverage precision at 10: {average_p_at_10}\nAverage precision at 20: {average_p_at_20}\nMean reciproral ranking: {m_r_r}\nAverage f score: {average_f_score}\n")
+        print(f"\nAverage precision at 5: {average_p_at_5}\nAverage precision at 10: {average_p_at_10}\nAverage precision at 20: {average_p_at_20}\nMean reciproral ranking: {m_r_r}\nAverage f score: {average_f_score}\n")

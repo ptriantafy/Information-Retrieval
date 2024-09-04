@@ -19,12 +19,15 @@ def main():
     preproc.remove_stop_words(os.path.join(curr_path,'../data/docs/flattened'))
     preproc.normalise_text(STEM, os.path.join(curr_path,'../data/docs/no_stop_words'))
 
-    preproc.normalise_text(STEM, os.path.join(curr_path,'../data/docs/no_stop_words'))
+    preproc.save_queries_separately(os.path.join(curr_path,'../data/queries/queries.txt'))
+    preproc.flatten_text(os.path.join(curr_path,'../data/queries/raw'))
+    preproc.remove_stop_words(os.path.join(curr_path,'../data/queries/flattened'))
+    preproc.normalise_text(STEM, os.path.join(curr_path,'../data/queries/no_stop_words'))
 
   
     inverted_index = inv.generate_inverted_index(os.path.join(curr_path,'../data/docs/normalized'), True)
-    inverted_index = inv.import_inverted_index(os.path.join(curr_path,'../data/inverted_index.txt'))
-
+    # inverted_index = inv.import_inverted_index(os.path.join(curr_path,'../data/inverted_index.txt'))
+    
 
     # Initialize VectorSpaceModel class
     vsm = VectorSpaceModel(inverted_index, os.path.join(curr_path,'../data/docs/normalized'))
@@ -33,8 +36,8 @@ def main():
                         ,docs_sparse_matrix=vsm.load_precomputed_vsm(os.path.join(curr_path,'saves/document_vectors.npz')))
        
     vsm.print_metrics(vsm.load_precomputed_vsm(os.path.join(curr_path,'saves/document_vectors.npz')))
-
-
+    # vsm.optimize()
+    
 
 
 if __name__ == '__main__':

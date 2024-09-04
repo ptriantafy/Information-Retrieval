@@ -45,25 +45,26 @@ class InvertedIndex:
 
         return inverted_index
 
-
-    def import_inverted_index(self, file_path: str) -> dict:
+    
+    def import_inverted_index(self, load_path: str) -> dict:
         inverted_index = {}
-        with open(file_path, 'r') as f:
+        
+        with open(load_path, 'r') as f:
             for line in f:
-                word, files = line.split(': ')
-                files = files.strip().split(') ')
-                for file_position in files:
-                    if file_position:
-                        file_position = file_position.replace('(', '').replace(')', '')
-                        file, position = file_position.split(', ')
-                        if word not in inverted_index:
-                            inverted_index[word] = {file: [position]}
-                        else:
-                            if file not in inverted_index[word]:
-                                inverted_index[word][file] = [position]
-                            else:
-                                inverted_index[word][file].append(position)
+                term, postings = line.split(': ')
+                postings = postings.strip().split(') ')
+                
+                for posting in postings:
+                    if posting:
+                        file, position = posting.strip('()').split(', ')
+                        if term not in inverted_index:
+                            inverted_index[term] = {}
+                        if file not in inverted_index[term]:
+                            inverted_index[term][file] = []
+                        inverted_index[term][file].append(int(position))
+        
         return inverted_index
+
 
     
     def __export_inverted_index(self,inverted_index:dict ,save_path:str)->None:
@@ -175,16 +176,3 @@ class Preprocessing:
                 f.write(text)
                 
 
-# stem all txt files in data/docs/raw and save them in data/docs/processed
-
-
-
-
-
-
-
-# preproc.save_queries_separately('data/queries/queries.txt')
-
-# preproc.flatten_text('data/queries/raw')
-# preproc.remove_stop_words('data/queries/flattened')
-# preproc.normalise_text(STEM, 'data/queries/no_stop_words')
