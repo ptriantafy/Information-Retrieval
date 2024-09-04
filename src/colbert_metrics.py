@@ -18,13 +18,13 @@ def colbert_metrics(file_path:str = '../data/results/colbert_results.txt'):
             query_number = int(parts[0])
             pred_docs = ast.literal_eval(parts[1])
             docs = extract_doc_id(index_to_doc(pred_docs))
-            relevant_docs = extract_relevant(query_number)
+            relevant_docs = get_true_relevant(query_number)
             p_at_20 = precision_at_k(docs, relevant_docs, 20)
             p_at_10 = precision_at_k(docs, relevant_docs, 10)
             p_at_5 = precision_at_k(docs, relevant_docs, 5)
-            print("Precision at 5: ", p_at_5)
-            print("Precision at 10: ", p_at_10)
-            print("Precision at 20: ", p_at_20)
+            # print("Precision at 5: ", p_at_5)
+            # print("Precision at 10: ", p_at_10)
+            # print("Precision at 20: ", p_at_20)
             average_p_at_20 = average_p_at_20 + p_at_20
             average_p_at_10 = average_p_at_10 + p_at_10
             average_p_at_5 = average_p_at_5 + p_at_5
@@ -68,7 +68,26 @@ def extract_doc_id(file: str|list) -> int:
     elif isinstance(file, list):
         return [extract_doc_id(f) for f in file]
  
-def extract_relevant(file_index:int):
+
+
+def get_relevant(file_path:str = '../data/results/colbert_results.txt')->list[list[int]]:
+    '''
+    read the *.tsv file and return the relevant documents for a specific query as a list of integers
+    '''
+    query_responses = []
+    with open(os.path.join(os.path.dirname(__file__), file_path), 'r') as file:
+        for line in file:
+            parts = line.strip().split('\t')
+            query_number = int(parts[0])
+            pred_docs = ast.literal_eval(parts[1])
+            docs = extract_doc_id(index_to_doc(pred_docs))
+            query_responses.insert(query_number-1, docs)
+
+    return query_responses
+
+
+
+def get_true_relevant(file_index:int):
     '''
     Returns the relevant documents for a specific query as a list of integers
     '''

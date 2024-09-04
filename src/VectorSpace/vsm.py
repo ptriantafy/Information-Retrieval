@@ -4,18 +4,19 @@ import os
 import time
 import re
 import math
+import matplotlib.pyplot as plt
 
 
 class VectorSpaceModel:
 
     
 
-    def __init__(self, inverted_index: dict, file_path:str = "data/docs/normalized") -> None:
+    def __init__(self, inverted_index: dict, file_path:str = "data/docs/normalized",tf_mode:int = 3, idf_mode:int=3) -> None:
         self.inverted_index = inverted_index
         self.list_of_docs = sorted(os.listdir(file_path))  
         self.file_path = file_path
-        self.TF_MODE = 3
-        self.IDF_MODE = 3
+        self.TF_MODE = tf_mode
+        self.IDF_MODE = idf_mode
 
 
     #///////////// Private Methods ///////////////
@@ -162,7 +163,7 @@ class VectorSpaceModel:
                             pred_relev = self.get_top_k_indices(cos_similarities, 20)
                             pred_relev = self.index_to_doc(pred_relev)
                             pred_relev = self.extract_doc_id(pred_relev)
-                            true_relev = self.extract_relevant(self.extract_doc_id(query))
+                            true_relev = self.get_true_relevant(self.extract_doc_id(query))
                             precision = self.precision(pred_relev, true_relev)
                             recall = self.recall(pred_relev, true_relev)
                             f_measure = self.harmonic_mean(precision, recall)
@@ -280,12 +281,6 @@ class VectorSpaceModel:
             return [self.extract_doc_id(f) for f in file]
 
 
-    def test_time(self,func:callable): #///TODO make it take fumction arguments
-        start_time = time.time()
-        func()
-        print("--- %f seconds ---" % (time.time() - start_time))
-
-
     def load_precomputed_vsm(self, path_to_file:str = 'saves/document_vectors.npz' ) -> sp.sparse.csr_matrix:
         '''
         Loads the precomputed document vectors from a .npz file 
@@ -294,12 +289,25 @@ class VectorSpaceModel:
         return docs_sparse_matrix
 
 
+    def compare_query(self, query_vector , docs_sparse_matrix: sp.sparse.csr_matrix = None, k_res: int=5 ) -> list:
+        '''
+        Compares a query vector to the documents in the docs_sparse_matrix and return a list of top k relevant documents
+        '''
+        relevant_docs = []
+
+        cos_similarities = self.get_cos_similarities(docs_sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
+                
+        for d_i in self.get_top_k_indices(cos_similarities, k_res):
+            relevant_docs.append( self.index_to_doc(d_i))
+
+        return self.extract_doc_id(relevant_docs)
 
 
-    def compare_queries(self, queries_path:str = 'data/queries/normalized', docs_sparse_matrix:sp.sparse.csr_matrix = None):
+    def compare_queries(self, queries_path: str = 'data/queries/normalized', docs_sparse_matrix: sp.sparse.csr_matrix = None) -> list:
         '''
         Compares the queries in the queries_path to the documents in the docs_sparse_matrix
         '''
+        relevant_docs = []
         results = []
         # with open(os.path.join(os.path.dirname(__file__), '../res/results.txt'), 'w+') as f:
         #     f.write("") # clear results.txt
@@ -313,6 +321,7 @@ class VectorSpaceModel:
                 # print documents in a pretty manner and write them in results.txt
                 for order, i in enumerate(self.get_top_k_indices(cos_similarities, 20)):
                     results.append(f"{order+1}.  {self.list_of_docs[i]}: {cos_similarities[i]}\n")
+                    relevant_docs.append(self.list_of_docs[i])
             results.append("\n")
         #Terminal print 
         output = ''.join(results)
@@ -327,8 +336,10 @@ class VectorSpaceModel:
         with open(file_path, 'w+') as f:
             f.write(output)
 
+        return relevant_docs
 
-    def extract_relevant(self, file_index:int):
+
+    def get_true_relevant(self, file_index:int):
         '''
         Returns the relevant documents for a specific query as a list of integers
         '''
@@ -347,6 +358,16 @@ class VectorSpaceModel:
                 relevant = relevant + 1
         return relevant/k
     
+    def precision(self, pred_rel:list, true_rel:list):
+        '''
+        Calculates the precision at k
+        '''
+        relevant = 0
+        for prediction in pred_rel:
+            if prediction in true_rel:
+                relevant = relevant + 1
+        return relevant/len(pred_rel)
+    
 
     def reciproral_ranking(self, pred_relev:list, true_relev:list):
         for i, prediction in enumerate(pred_relev):
@@ -363,19 +384,12 @@ class VectorSpaceModel:
         return relevant/len(true_rel)
     
 
-    def precision(self, pred_rel:list, true_rel:list):
-        relevant = 0
-        for prediction in pred_rel:
-            if prediction in true_rel:
-                relevant = relevant + 1
-        return relevant/len(pred_rel)
-
-
     def harmonic_mean(self, precision:float, recall:float):
         if precision + recall == 0:
             return 0
         return 2*(precision*recall)/(precision + recall)
     
+
     def print_metrics(self,docs_sparse_matrix:sp.sparse.csr_matrix ):
         with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'w+') as f:
             f.write("")
@@ -385,16 +399,16 @@ class VectorSpaceModel:
         m_r_r = 0
         average_f_score = 0
         for query in (os.listdir('data/queries/normalized')):
-            print(f"query file: {query}")
+            # print(f"query file: {query}")
             with open(os.path.join('data/queries/normalized', query), 'r') as f:
-                with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
-                    f.write(f"\nquery file: {query}\n")
+                # with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
+                    # f.write(f"\nquery file: {query}\n")
                 query_vector = self.query_vectorize(os.path.join('data/queries/normalized', query))
                 cos_similarities = self.get_cos_similarities(docs_sparse_matrix.tocsr().toarray()[1:], query_vector.tocsr().toarray())
                 pred_relev = self.get_top_k_indices(cos_similarities, 20)
                 pred_relev = self.index_to_doc(pred_relev)
                 pred_relev = self.extract_doc_id(pred_relev)
-                true_relev = self.extract_relevant(self.extract_doc_id(query))
+                true_relev = self.get_true_relevant(self.extract_doc_id(query))
                 precision = self.precision(pred_relev, true_relev)
                 recall = self.recall(pred_relev, true_relev)
                 precision_at_5 = self.precision_at_k(pred_relev, true_relev, 5)
@@ -407,10 +421,10 @@ class VectorSpaceModel:
                 average_p_at_20 += precision_at_20
                 m_r_r += reciproral_ranking
                 average_f_score += harmonic_mean
-                with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
-                    f.write(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
-                print(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
-                print()
+                # with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
+                #     f.write(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
+                # print(f"Precision: {precision}\nRecall: {recall}\nPrecision at 5: {precision_at_5}\nPrecision at 10: {precision_at_10}\nPrecision at 20: {precision_at_20}\nHarmonic mean: {harmonic_mean}\nReciproral ranking: {reciproral_ranking}\n")
+                # print()
         average_p_at_5 = average_p_at_5/19
         average_p_at_10 = average_p_at_10/19
         average_p_at_20 = average_p_at_20/19
@@ -419,3 +433,6 @@ class VectorSpaceModel:
         with open(os.path.join(os.path.dirname(__file__), '../../data/results/vsm_metrics.txt'), 'a') as f:
             f.write(f"\nAverage precision at 5: {average_p_at_5}\nAverage precision at 10: {average_p_at_10}\nAverage precision at 20: {average_p_at_20}\nMean reciproral ranking: {m_r_r}\nAverage f score: {average_f_score}\n")
         print(f"\nAverage precision at 5: {average_p_at_5}\nAverage precision at 10: {average_p_at_10}\nAverage precision at 20: {average_p_at_20}\nMean reciproral ranking: {m_r_r}\nAverage f score: {average_f_score}\n")
+
+
+    
